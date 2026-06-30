@@ -1,0 +1,177 @@
+import discord
+
+from discord.ext import commands
+
+import random
+
+import os
+
+import json
+
+from pathlib import Path
+
+
+
+intents = discord.Intents.default()
+
+intents.message_content = True
+
+intents.dm_messages = True  # Important for DMs
+
+
+
+bot = commands.Bot(command_prefix='!', intents=intents)
+
+
+
+# File to store user keys persistently
+
+KEYS_FILE = Path("user_keys.json")
+
+
+
+def load_keys():
+
+    if KEYS_FILE.exists():
+
+        try:
+
+            with open(KEYS_FILE, "r") as f:
+
+                return json.load(f)
+
+        except:
+
+            return {}
+
+    return {}
+
+
+
+def save_keys(keys):
+
+    with open(KEYS_FILE, "w") as f:
+
+        json.dump(keys, f, indent=2)
+
+
+
+user_keys = load_keys()
+
+
+
+@bot.event
+
+async def on_ready():
+
+    print(f'✅ Logged in as {bot.user}')
+
+    print(f"Loaded {len(user_keys)} user keys")
+
+    try:
+
+        synced = await bot.tree.sync()
+
+        print(f"Synced {len(synced)} slash commands")
+
+    except Exception as e:
+
+        print(f"Failed to sync commands: {e}")
+
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="🔑 key generator"))
+
+
+
+@bot.command(name='generate')
+
+async def generate_key(ctx):
+
+    user_id = str(ctx.author.id)
+
+    
+
+    if user_id in user_keys:
+
+        key = user_keys[user_id]
+
+        try:
+
+            await ctx.author.send(f"🔑 **Your personal key:** `{key}`\nThis key is permanently assigned to you.")
+
+            await ctx.send(f"✅ {ctx.author.mention}, I've sent your key in **DM**!")
+
+        except:
+
+            await ctx.send("❌ I couldn't send you a DM. Please enable DMs from server members.")
+
+    else:
+
+        number = random.randint(10000000, 99999999)
+
+        key = f"KONGER-{number}"
+
+        user_keys[user_id] = key
+
+        save_keys(user_keys)
+
+        
+
+        try:
+
+            await ctx.author.send(f"🔑 **Your new personal key:** `{key}`\nThis key is now permanently assigned to you.")
+
+            await ctx.send(f"✅ {ctx.author.mention}, I've sent your new key in **DM**!")
+
+        except:
+
+            await ctx.send("❌ I couldn't send you a DM. Please enable DMs from server members.")
+
+
+
+@bot.tree.command(name="generate", description="Get your personal KONGER key in DM")
+
+async def slash_generate(interaction: discord.Interaction):
+
+    user_id = str(interaction.user.id)
+
+    
+
+    if user_id in user_keys:
+
+        key = user_keys[user_id]
+
+        try:
+
+            await interaction.user.send(f"🔑 **Your personal key:** `{key}`")
+
+            await interaction.response.send_message("✅ Check your DMs!", ephemeral=True)
+
+        except:
+
+            await interaction.response.send_message("❌ Couldn't send DM. Please enable DMs.", ephemeral=True)
+
+    else:
+
+        number = random.randint(10000000, 99999999)
+
+        key = f"KONGER-{number}"
+
+        user_keys[user_id] = key
+
+        save_keys(user_keys)
+
+        
+
+        try:
+
+            await interaction.user.send(f"🔑 **Your new personal key:** `{key}`\nPermanently assigned to you.")
+
+            await interaction.response.send_message("✅ Check your DMs for your key!", ephemeral=True)
+
+        except:
+
+            await interaction.response.send_message("❌ Couldn't send DM. Please enable DMs.", ephemeral=True)
+
+
+
+bot.run(os.getenv('DISCORD_TOKEN'))
